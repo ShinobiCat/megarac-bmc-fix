@@ -33,7 +33,7 @@ cookie_req = request.Request(
 
 try:
     cookie_raw = urllib.request.urlopen(cookie_req).read().decode('utf-8')
-except urllib.error.URLError as e:
+except error.URLError as e:
     print("Error connecting to server: ", e.reason)
     sys.exit(1)
 
@@ -54,7 +54,7 @@ token_req = urllib.request.Request(
 
 try:
     token_raw = urllib.request.urlopen(token_req).read().decode('utf-8')
-except urllib.error.URLError as e:
+except error.URLError as e:
     print("Error connecting to server: ", e.reason)
     sys.exit(1)
 
