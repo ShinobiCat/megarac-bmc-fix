@@ -2,7 +2,7 @@
 
 import sys
 import re
-import urllib
+from urllib import request
 from getpass import getpass
 
 if sys.version[0] == '2':
@@ -20,12 +20,14 @@ cookie_url = 'http://{}/rpc/WEBSES/create.asp'.format(ip)
 token_url = 'http://{}/rpc/getsessiontoken.asp'.format(ip)
 
 # Request to create session cookie
-cookie_req = urllib.request.Request(
-    data=urllib.parse.urlencode({
-        'WEBVAR_USERNAME': ipmi_user, 
-        'WEBVAR_PASSWORD': ipmi_pass
-    }).encode('utf-8'),
-    url=cookie_url
+cookie_req = request.Request(
+    data=urlencode(
+        {
+            'WEBVAR_USERNAME': ipmi_user, 
+            'WEBVAR_PASSWORD': ipmi_pass
+        }
+    ).encode('utf-8'),
+    url='http://{}/rpc/WEBSES/create.asp'.format(ip)
 )
 
 try:
