@@ -1,28 +1,61 @@
 # The first part of the code handles the authentication and session management
 
-import sys
+import os
 import re
-from urllib import request
-from urllib.parse import urlencode
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+import time
+
+from argparse import ArgumentParser
 from getpass import getpass
+import urllib.request
+import urllib.parse
+import urllib.error
 
-if sys.version[0] == '2':
-    input = raw_input
+parser = ArgumentParser()
+hostip = parser.add_mutually_exclusive_group(required=False)
+hostip.add_argument('-ip', '--hostip', action='store')
+hostip.add_argument('HOST_IP', action='store', nargs='?')
 
-ip = input('Input host IP: ')
-ipmi_user = input('Input username: ')
-ipmi_pass = getpass('Input password: ')
+username = parser.add_mutually_exclusive_group(required=False)
+username.add_argument('-u', '--username', action='store')
+username.add_argument(
+    'USERNAME', 
+    action='store', 
+    help='Can also be provided interactively to hide from console history.', 
+    nargs='?'
+)
 
-# Regex pattern to find session data
+passwd = parser.add_mutually_exclusive_group(required=False)
+passwd.add_argument('-pw', '--password', action='store')
+passwd.add_argument(
+    'PASSWORD', 
+    action='store', 
+    help='Can also be provided interactively to hide from console history.',
+    nargs='?'
+)
+
+parser.add_argument(
+    '-l', 
+    '--launch', 
+    action='store_true', 
+    default=False, 
+    help='Launch generated jviewer file with javaws after generating it.'
+)
+
+pargs = parser.parse_args()
+
+ip = pargs.hostip or pargs.HOST_IP or input('Input host IP: ')
+ipmi_user = pargs.username or pargs.USERNAME or getpass('Input username: ')
+ipmi_pass = pargs.password or pargs.PASSWORD or getpass('Input password: ')
+
 resp_search = re.compile(r"'(SESSION_COOKIE|STOKEN|SESSION_TOKEN)' : '(.+)'")
 
-# URLs to get session cookie and session token
-cookie_url = 'http://{}/rpc/WEBSES/create.asp'.format(ip)
-token_url = 'http://{}/rpc/getsessiontoken.asp'.format(ip)
-
-# Request to create session cookie
-cookie_req = request.Request(
-    data=urlencode(
+cookie_req = urllib.request.Request(
+    data=urllib.parse.urlencode(
         {
             'WEBVAR_USERNAME': ipmi_user, 
             'WEBVAR_PASSWORD': ipmi_pass
@@ -33,47 +66,20 @@ cookie_req = request.Request(
 
 try:
     cookie_raw = urllib.request.urlopen(cookie_req).read().decode('utf-8')
-except error.URLError as e:
-    print("Error connecting to server: ", e.reason)
-    sys.exit(1)
+except urllib.error.URLError as e:
+    print("Error: Could not connect to host. Please check the host IP and try again.")
+    sys.exit()
 
-# Find session cookie in the response
-cookie_match = resp_search.search(cookie_raw)
+cookie = resp_search.search(cookie_raw).groups()[1]
 
-if cookie_match is None:
-    print('Could not find session cookie.')
-    sys.exit(1)
-
-cookie = cookie_match.groups()[1]
-
-# Request to create session token
 token_req = urllib.request.Request(
     headers={'Cookie': 'SessionCookie={}'.format(cookie)}, 
-    url=token_url
+    url='http://{}/rpc/getsessiontoken.asp'.format(ip)
 )
-
-try:
-    token_raw = urllib.request.urlopen(token_req).read().decode('utf-8')
-except error.URLError as e:
-    print("Error connecting to server: ", e.reason)
-    sys.exit(1)
-
-# Find session token in the response
-token_match = resp_search.search(token_raw)
-
-if token_match is None:
-    print('Could not find session token.')
-    sys.exit(1)
-
-token = token_match.groups()[1]
+token_raw = urllib.request.urlopen(token_req).read().decode('utf-8')
+token = resp_search.search(token_raw).groups()[1]
 
 # The second part of the code generates the JViewer file and launches it
-
-import os
-import subprocess
-import tempfile
-import shutil
-import time
 
 jnlp_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
