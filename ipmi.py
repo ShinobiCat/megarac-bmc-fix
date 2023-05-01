@@ -3,6 +3,7 @@
 import sys
 import re
 from urllib import request
+from urllib.parse import urlencode
 from getpass import getpass
 
 if sys.version[0] == '2':
