@@ -86,3 +86,53 @@ jnlp_template = """\
         <vendor>American Megatrends, Inc.</vendor>
         <description kind="one-line">
             JViewer Console Redirection Application
+        </description>
+        <description kind="tooltip">
+            JViewer Console Redirection Application
+        </description>
+        <description kind="short">
+            JViewer enables a user to view the video display 
+            of managed server via KVM. It also enables the 
+            user to redirect his local keyboard, mouse for 
+            managing the server remotely.
+        </description>
+    </information>
+    <security>
+        <all-permissions/>
+    </security>
+    <resources>
+        <j2se version="1.5+"/>
+        <jar href="release/JViewer.jar"/>
+    </resources>
+    <resources os="Windows" arch="amd64">
+        <j2se version="1.5+"/>
+        <nativelib href="release/Win64.jar"/>
+    </resources>
+    <resources os="Windows" arch="x86">
+        <j2se version="1.5+"/>
+        <nativelib href="release/Win32.jar"/>
+    </resources>
+    <resources os="Linux" arch="x86">
+        <j2se version="1.5+"/>
+        <nativelib href="release/Linux_x86_32.jar"/>
+    </resources>
+    <resources os="Linux" arch="i386">
+        <j2se version="1.5+"/>
+        <nativelib href="release/Linux_x86_32.jar"/>
+    </resources>
+    <resources os="Linux" arch="x86_64">
+        <j2se version="1.5+"/>
+        <nativelib href="release/Linux_x86_64.jar"/>
+    </resources>
+    <resources os="Linux" arch="amd64">
+        <j2se version="1.5+"/>
+        <nativelib href="release/Linux_x86_64.jar"/>
+    </resources>
+    <application-desc>
+        <argument>{ip}</argument>
+        <argument>7578</argument>
+        <argument>{token}</argument>
+        <argument>{cookie}</argument>
+    </application-desc>
+</jnlp>
+""".format(ip=ip, token=token, cookie=cookie)
