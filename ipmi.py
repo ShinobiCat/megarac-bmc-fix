@@ -1,82 +1,69 @@
-#! /usr/bin/env python
-
-import os
-import re
-import shutil
-import subprocess
 import sys
+import re
+import urllib
+import subprocess
 import tempfile
-import textwrap
+import shutil
 import time
 
-from argparse import ArgumentParser
-from getpass import getpass
-
 if sys.version[0] == '2':
-    from urllib import urlencode
-    from urllib2 import urlopen, Request
-else:
-    from urllib.parse import urlencode
-    from urllib.request import urlopen, Request
+    input = raw_input
 
+ip = input('Input host IP: ')
+ipmi_user = input('Input username: ')
+ipmi_pass = input('Input password: ')
 
-parser = ArgumentParser()
-hostip = parser.add_mutually_exclusive_group(required=False)
-hostip.add_argument('-ip', '--hostip', action='store')
-hostip.add_argument('HOST_IP', action='store', nargs='?')
-
-username = parser.add_mutually_exclusive_group(required=False)
-username.add_argument('-u', '--username', action='store')
-username.add_argument(
-    'USERNAME', 
-    action='store', 
-    help='Can also be provided interactively to hide from console history.', 
-    nargs='?'
-)
-
-passwd = parser.add_mutually_exclusive_group(required=False)
-passwd.add_argument('-pw', '--password', action='store')
-passwd.add_argument(
-    'PASSWORD', 
-    action='store', 
-    help='Can also be provided interactively to hide from console history.',
-    nargs='?'
-)
-
-parser.add_argument(
-    '-l', 
-    '--launch', 
-    action='store_true', 
-    default=False, 
-    help='Launch generated jviewer file with javaws after generating it.'
-)
-
-pargs = parser.parse_args()
-
-ip = pargs.hostip or pargs.HOST_IP or input('Input host IP: ')
-ipmi_user = pargs.username or pargs.USERNAME or getpass('Input username: ')
-ipmi_pass = pargs.password or pargs.PASSWORD or getpass('Input password: ')
-
+# Regex pattern to find session data
 resp_search = re.compile(r"'(SESSION_COOKIE|STOKEN|SESSION_TOKEN)' : '(.+)'")
 
-cookie_req = Request(
-    data=urlencode(
-        {
-            'WEBVAR_USERNAME': ipmi_user, 
-            'WEBVAR_PASSWORD': ipmi_pass
-        }
-    ).encode('utf-8'),
-    url='http://{}/rpc/WEBSES/create.asp'.format(ip)
-)
-cookie_raw = urlopen(cookie_req).read().decode('utf-8')
-cookie = resp_search.search(cookie_raw).groups()[1]
+# URLs to get session cookie and session token
+cookie_url = 'http://{}/rpc/WEBSES/create.asp'.format(ip)
+token_url = 'http://{}/rpc/getsessiontoken.asp'.format(ip)
 
-token_req = Request(
-    headers={'Cookie': 'SessionCookie={}'.format(cookie)}, 
-    url='http://{}/rpc/getsessiontoken.asp'.format(ip)
+# Request to create session cookie
+cookie_req = urllib.request.Request(
+    data=urllib.parse.urlencode({
+        'WEBVAR_USERNAME': ipmi_user, 
+        'WEBVAR_PASSWORD': ipmi_pass
+    }).encode('utf-8'),
+    url=cookie_url
 )
-token_raw = urlopen(token_req).read().decode('utf-8')
-token = resp_search.search(token_raw).groups()[1]
+
+try:
+    cookie_raw = urllib.request.urlopen(cookie_req).read().decode('utf-8')
+except urllib.error.URLError as e:
+    print("Error connecting to server: ", e.reason)
+    sys.exit(1)
+
+# Find session cookie in the response
+cookie_match = resp_search.search(cookie_raw)
+
+if cookie_match is None:
+    print('Could not find session cookie.')
+    sys.exit(1)
+
+cookie = cookie_match.groups()[1]
+
+# Request to create session token
+token_req = urllib.request.Request(
+    headers={'Cookie': 'SessionCookie={}'.format(cookie)}, 
+    url=token_url
+)
+
+try:
+    token_raw = urllib.request.urlopen(token_req).read().decode('utf-8')
+except urllib.error.URLError as e:
+    print("Error connecting to server: ", e.reason)
+    sys.exit(1)
+
+# Find session token in the response
+token_match = resp_search.search(token_raw)
+
+if token_match is None:
+    print('Could not find session token.')
+    sys.exit(1)
+
+token = token_match.groups()[1]
 
 jnlp_template = """\
 <?xml version="1.0" encoding="UTF-8"?>
@@ -116,23 +103,4 @@ jnlp_template = """\
         <j2se version="1.5+"/>
         <nativelib href="release/Linux_x86_32.jar"/>
     </resources>
-    <resources os="Linux" arch="i386">
-        <j2se version="1.5+"/>
-        <nativelib href="release/Linux_x86_32.jar"/>
-    </resources>
-    <resources os="Linux" arch="x86_64">
-        <j2se version="1.5+"/>
-        <nativelib href="release/Linux_x86_64.jar"/>
-    </resources>
-    <resources os="Linux" arch="amd64">
-        <j2se version="1.5+"/>
-        <nativelib href="release/Linux_x86_64.jar"/>
-    </resources>
-    <application-desc>
-        <argument>{ip}</argument>
-        <argument>7578</argument>
-        <argument>{token}</argument>
-        <argument>{cookie}</argument>
-    </application-desc>
-</jnlp>
-""".format(ip=ip, token=token, cookie=cookie)
+    <resources os="Linux
